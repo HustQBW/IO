@@ -1,0 +1,89 @@
+#include"stdio.h"
+#include"xparameters.h"
+#include"xintc_l.h"
+#include"xil_io.h"
+#include"xgpio_l.h"
+#include"xtmrctr_l.h"
+#include<time.h>
+#include"sleep.h"
+#define XGPIO_BASEADDR 0x40000000
+#define XGPIO1_BASEADDR 0x40010000
+#define XGPIO2_BASEADDR 0x40020000
+#define INTC_BASEADDR 0x41200000
+#define TIMER_BASEADDR 0x41c00000
+void My_ISR()__attribute__((interrupt_handler));
+void BtnHandler();
+signed short int number,bnum;
+short int code;
+char seg[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+short pos=0xff7f;
+int main()
+{
+
+	Xil_Out32(XGPIO_BASEADDR+XGPIO_TRI_OFFSET,0xffff);
+	Xil_Out32(XGPIO1_BASEADDR+XGPIO_TRI_OFFSET,0x0);
+	Xil_Out32(XGPIO1_BASEADDR+XGPIO_TRI2_OFFSET,0x0);
+	Xil_Out32(XGPIO2_BASEADDR+XGPIO_TRI_OFFSET,0x1f);
+	Xil_Out32(XGPIO2_BASEADDR+XGPIO_IER_OFFSET,0x1);
+	Xil_Out32(XGPIO2_BASEADDR+XGPIO_GIE_OFFSET,0x80000000);
+	Xil_Out32(INTC_BASEADDR+XIN_IER_OFFSET,0x2);
+	Xil_Out32(INTC_BASEADDR+XIN_MER_OFFSET,0x3);
+	microblaze_enable_interrupts();
+	return 0;
+}
+void My_ISR()
+{
+	int status;
+	status=Xil_In32(INTC_BASEADDR+XIN_ISR_OFFSET);
+	if((status&0x2)==0x2)BtnHandler();
+	Xil_Out32(INTC_BASEADDR+XIN_IAR_OFFSET,status);
+}
+void BtnHandler()
+{
+	int btncode;
+	btncode=Xil_In32(XGPIO2_BASEADDR+XGPIO_DATA_OFFSET)&0x1f;
+	if(btncode!=0)
+	{
+		number=Xil_In16(0x40000000);
+	}
+		if((number&0x8000)==0x0000)bnum=number;
+		else bnum=(~number)+1+0x8000;
+		code=bnum;
+		for(int i=3;i>=0;i--)
+		{
+			code=code>>(4*(3-i));
+			code=code&0x000f;
+			/*0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,
+0x80,0x90,0x88,0x83,0xc6,0xa1,0x86,0x8e */
+			switch(code)
+			{
+			case 0x0:seg[i]=0xc0;break;
+			case 0x1:seg[i]=0xf9;break;
+			case 0x2:seg[i]=0xa4;break;
+			case 0x3:seg[i]=0xb0;break;
+			case 0x4:seg[i]=0x99;break;
+			case 0x5:seg[i]=0x92;break;
+			case 0x6:seg[i]=0x82;break;
+			case 0x7:seg[i]=0xf8;break;
+			case 0x8:seg[i]=0x80;break;
+			case 0x9:seg[i]=0x90;break;
+			case 0xA:seg[i]=0x88;break;
+			case 0xB:seg[i]=0x83;break;
+			case 0xC:seg[i]=0xc6;break;
+			case 0xD:seg[i]=0xa1;break;
+			case 0xE:seg[i]=0x86;break;
+			case 0xF:seg[i]=0x8e;break;
+			}
+			code=bnum;
+		}
+		for(int j=0;j<8;j++)
+		{
+		Xil_Out8(0x40010008,seg[j]);
+		Xil_Out8(0x40010000,pos);
+		usleep(1000);
+		pos=pos>>1;
+		}
+		pos=0xff7f;
+
+
+}
